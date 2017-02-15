@@ -20,7 +20,7 @@ var Ecurve *ECCurveParams
 
 func InitSecp256k1() {
 
-	Ecurve := &ECCurveParams{256, nil, nil, nil, nil, nil, nil}
+	Ecurve = &ECCurveParams{256, nil, nil, nil, nil, nil, nil}
 	Ecurve.P, _ = new(big.Int).SetString("FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFEFFFFFC2F", 16)
 	Ecurve.N, _ = new(big.Int).SetString("FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFEBAAEDCE6AF48A03BBFD25E8CD0364141", 16)
 	Ecurve.A, _ = new(big.Int).SetString("0000000000000000000000000000000000000000000000000000000000000000", 16)
@@ -44,7 +44,7 @@ func InitSecp256k1() {
 
 func InitSecp256r1() {
 
-	Ecurve := &ECCurveParams{256, nil, nil, nil, nil, nil, nil}
+	Ecurve = &ECCurveParams{256, nil, nil, nil, nil, nil, nil}
 	Ecurve.P, _ = new(big.Int).SetString("00FFFFFFFF00000001000000000000000000000000FFFFFFFFFFFFFFFFFFFFFFFF", 16)
 	Ecurve.N, _ = new(big.Int).SetString("00FFFFFFFF00000001000000000000000000000000FFFFFFFFFFFFFFFFFFFFFFFC", 16)
 	Ecurve.A, _ = new(big.Int).SetString("005AC635D8AA3A93E7B3EBBD55769886BC651D06B0CC53B0F63BCE3C3E27D2604B", 16)

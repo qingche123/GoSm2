@@ -89,9 +89,8 @@ func NewGenKeyPair() (*PrivateKey, *PublicKey, error) {
 	mprikey := new(PrivateKey)
 
 	k, _ := RandomNum(32)
-	dk := big.NewInt(0).SetBytes(k)
 
-	mprikey.d = dk
+	mprikey.d = big.NewInt(0).SetBytes(k)
 	mpubkey.pbkey.Mul(G, k)
 	mprikey.pbkey = mpubkey.pbkey
 
@@ -102,6 +101,8 @@ func Sign(privateKey *PrivateKey, data []byte) ([]big.Int, error) {
 	if privateKey == nil {
 		fmt.Println("prikey is nil")
 	}
+	a := big.NewInt(0)
+	a.Set(Ecurve.N)
 	e := CaculateE(Ecurve.N, data)
 
 	mpriKey := make([]byte, len(privateKey.d.Bytes())+1)

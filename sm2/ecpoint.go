@@ -3,6 +3,7 @@ package sm2
 import (
 	"fmt"
 	"math/big"
+	//"os"
 )
 
 //----------------------------------------------------------------------
@@ -37,9 +38,9 @@ func DumpECPoint(dst *ECPoint, src *ECPoint) {
 
 func (e *ECPoint) IsInfinity() bool {
 	if e.X == nil && e.Y == nil {
-		return false
-	} else {
 		return true
+	} else {
+		return false
 	}
 }
 
@@ -65,47 +66,57 @@ func DecompressPoint(yTilde int64, X1 *big.Int, curve *ECCurveParams) *ECPoint {
 	y.AddBig(y, curve.A)
 	x.Mul(y, x)
 	x.AddBig(x, curve.B)
+
 	beta := x.Sqrt()
 
+	//PrintHex("beta====", beta.value.Bytes(), len(beta.value.Bytes()))
 	if beta == nil {
 		fmt.Println("Invalid point compression")
+		//os.Exit(0)
 	}
 
 	betaValue := new(big.Int).Set(beta.value)
-	bit0 := new(big.Int).Mod(betaValue, big.NewInt(2))
+
+	bit0 := big.NewInt(0)
+	bit0.Mod(betaValue, big.NewInt(2))
+
 	if bit0.Int64() != yTilde {
-		beta = &ECFieldElement{big.NewInt(0).Sub(curve.P, betaValue), curve}
+		v := big.NewInt(0)
+		v.Sub(curve.P, betaValue)
+		beta = &ECFieldElement{v, curve}
 	}
 
 	return &ECPoint{x, beta, curve}
 }
 
 func DecodePoint(encoded []byte, curve *ECCurveParams) *ECPoint {
-	var p *ECPoint = nil
+
+	p := NewECPoint()
 
 	expectedLength := (curve.P.BitLen() + 7) / 8
 
 	switch encoded[0] {
-	case 0x00:
+	case 0x00: // infinity
 		if len(encoded) != 1 {
 			fmt.Println("Incorrect length for infinity encoding", "encoded")
 		}
-		p = Infinity
-	case 0x02, 0x03:
+		DumpECPoint(p, Infinity)
+	case 0x02, 0x03: // compressed
 		{
 			if len(encoded) != expectedLength+1 {
 				fmt.Println("Incorrect length for infinity encoding", "encoded")
 			}
 			yTilde := encoded[0] & 1
-			Tmp := encoded[1:]
-			Reverse(Tmp)
-			Tmp1 := make([]byte, len(Tmp)+1)
-			copy(Tmp1, Tmp)
+			tmp := make([]byte, len(encoded)-1)
+			copy(tmp, encoded[1:])
+			Reverse(tmp)
+			tmp1 := make([]byte, len(tmp)+1)
+			copy(tmp1, tmp)
 
-			X1 := new(big.Int).SetBytes(Tmp1)
+			X1 := new(big.Int).SetBytes(tmp1)
 			p = DecompressPoint(int64(yTilde), X1, curve)
 		}
-	case 0x04, 0x06, 0x07:
+	case 0x04, 0x06, 0x07: // uncompressed, hybrid, hybrid
 		{
 			if len(encoded) != (2*expectedLength + 1) {
 				fmt.Println("Incorrect length for uncompressed/hybrid encoding", "encoded")
@@ -136,33 +147,54 @@ func DecodePoint(encoded []byte, curve *ECCurveParams) *ECPoint {
 func (e *ECPoint) EncodePoint(compressed bool) []byte {
 	if e.IsInfinity() {
 		Tmp := make([]byte, 1)
+		fmt.Println("IsInfinity")
 		return Tmp
 	}
+
 	var data []byte
+
 	if compressed {
 		data = make([]byte, 33)
 	} else {
 		data = make([]byte, 65)
+
 		yBytes := e.Y.value.Bytes()
-		Reverse(yBytes)
-		copy(data[65-len(data):], yBytes)
+		PrintHex("yBytes", yBytes, len(yBytes))
+
+		tmp := make([]byte, len(yBytes))
+		copy(tmp, yBytes)
+		PrintHex("tmp", tmp, len(tmp))
+
+		Reverse(tmp)
+		PrintHex("tmp", tmp, len(tmp))
+
+		copy(data[65-len(yBytes):], tmp)
+		PrintHex("data", data, 65)
 	}
 
 	xBytes := e.X.value.Bytes()
-	Reverse(xBytes)
-	copy(data[33-len(data):], xBytes)
+	PrintHex("xBytes", xBytes, len(xBytes))
+
+	tmp := make([]byte, len(xBytes))
+	copy(tmp, xBytes)
+	PrintHex("tmp", tmp, len(tmp))
+
+	Reverse(tmp)
+	PrintHex("tmp", tmp, len(tmp))
+
+	copy(data[33-len(tmp):], tmp)
+	PrintHex("data", data, len(data))
 
 	if !compressed {
 		data[0] = 0x04
 	} else {
-		Tmp := big.NewInt(0)
-		Tmp.Mod(e.Y.value, big.NewInt(2))
-		if Tmp.Int64() == 0 {
+		if IsEven(e.Y.value) {
 			data[0] = 0x02
 		} else {
 			data[0] = 0x03
 		}
 	}
+
 	return data
 }
 

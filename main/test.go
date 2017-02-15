@@ -7,6 +7,7 @@ import (
 )
 
 func main() {
+
 	Init()
 
 	prikey, pubkey, err := NewGenKeyPair()

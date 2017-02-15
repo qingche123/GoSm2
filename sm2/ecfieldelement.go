@@ -7,8 +7,8 @@ import (
 )
 
 type ECFieldElement struct {
-	value *big.Int
-	curve *ECCurveParams
+	value      *big.Int
+	curveParam *ECCurveParams
 }
 
 func NewECFieldElement() *ECFieldElement {
@@ -21,7 +21,7 @@ func NewECFieldElement() *ECFieldElement {
 func DumpECFieldElement(dst *ECFieldElement, src *ECFieldElement) {
 
 	dst.value.Set(src.value)
-	dst.curve = src.curve
+	dst.curveParam = src.curveParam
 }
 
 func GetLowestSetBit(k *big.Int) int {
@@ -176,23 +176,23 @@ func (e *ECFieldElement) Square() *ECFieldElement {
 
 	Tmp := big.NewInt(0)
 	Tmp.Mul(e.value, e.value)
-	Tmp.Mod(Tmp, e.curve.P)
+	Tmp.Mod(Tmp, e.curveParam.P)
 
-	return &ECFieldElement{Tmp, e.curve}
+	return &ECFieldElement{Tmp, e.curveParam}
 }
 
 func (e *ECFieldElement) Sqrt() *ECFieldElement {
-	if e.curve.P.Bit(1) == 1 {
+	if e.curveParam.P.Bit(1) == 1 {
 		Tmp1 := big.NewInt(0)
-		Tmp1.Rsh(e.curve.P, 2)
+		Tmp1.Rsh(e.curveParam.P, 2)
 		Tmp1.Add(Tmp1, big.NewInt(1))
 
 		Tmp2 := big.NewInt(0)
-		Tmp2.Exp(e.value, Tmp1, e.curve.P)
+		Tmp2.Exp(e.value, Tmp1, e.curveParam.P)
 
-		z := &ECFieldElement{Tmp2, e.curve}
-
-		if z.Square().Equals(e) {
+		z := &ECFieldElement{Tmp2, e.curveParam}
+		zsq := z.Square()
+		if zsq.Equals(e) {
 			return z
 		} else {
 			fmt.Println("error z^2 != z")
@@ -201,13 +201,13 @@ func (e *ECFieldElement) Sqrt() *ECFieldElement {
 	}
 
 	qMinusOne := big.NewInt(0)
-	qMinusOne.Sub(e.curve.P, big.NewInt(1))
+	qMinusOne.Sub(e.curveParam.P, big.NewInt(1))
 
 	legendExponent := big.NewInt(0)
 	legendExponent.Rsh(qMinusOne, 1)
 
 	Tmp := big.NewInt(0)
-	Tmp.Exp(e.value, legendExponent, e.curve.P)
+	Tmp.Exp(e.value, legendExponent, e.curveParam.P)
 	if Tmp.Cmp(big.NewInt(1)) != 0 {
 		return nil
 	}
@@ -223,7 +223,7 @@ func (e *ECFieldElement) Sqrt() *ECFieldElement {
 	Q.Set(e.value)
 	fourQ := big.NewInt(0)
 	fourQ.Lsh(Q, 2)
-	fourQ.Mod(fourQ, e.curve.P)
+	fourQ.Mod(fourQ, e.curveParam.P)
 
 	U := big.NewInt(0)
 	V := big.NewInt(0)
@@ -232,12 +232,12 @@ func (e *ECFieldElement) Sqrt() *ECFieldElement {
 		P := big.NewInt(0)
 		for {
 			Tmp1 := big.NewInt(0)
-			P, _ := rand.Prime(rand.Reader, e.curve.P.BitLen())
+			P, _ := rand.Prime(rand.Reader, e.curveParam.P.BitLen())
 
-			if P.Cmp(e.curve.P) < 0 {
+			if P.Cmp(e.curveParam.P) < 0 {
 				Tmp1.Mul(P, P)
 				Tmp1.Sub(Tmp1, fourQ)
-				Tmp1.Exp(Tmp1, legendExponent, e.curve.P)
+				Tmp1.Exp(Tmp1, legendExponent, e.curveParam.P)
 
 				if Tmp1.Cmp(qMinusOne) == 0 {
 					break
@@ -246,21 +246,21 @@ func (e *ECFieldElement) Sqrt() *ECFieldElement {
 		}
 
 		//var Array [2]*big.Int
-		result := FastLucasSequence(e.curve.P, P, Q, k)
+		result := FastLucasSequence(e.curveParam.P, P, Q, k)
 
 		U.Set(&result[0])
 		V.Set(&result[1])
 
 		Tmp2 := big.NewInt(0)
 		Tmp2.Mul(V, V)
-		Tmp2.Mod(Tmp2, e.curve.P)
+		Tmp2.Mod(Tmp2, e.curveParam.P)
 		if Tmp2.Cmp(fourQ) == 0 {
 			if V.Bit(0) == 1 {
-				V.Add(V, e.curve.P)
+				V.Add(V, e.curveParam.P)
 			}
 			V.Rsh(V, 1)
 
-			return &ECFieldElement{V, e.curve}
+			return &ECFieldElement{V, e.curveParam}
 		}
 		if (U.Cmp(big.NewInt(0)) != 0) || (U.Cmp(qMinusOne) != 0) {
 			break
@@ -294,87 +294,87 @@ func (e *ECFieldElement) Neg(x *ECFieldElement) *ECFieldElement {
 
 	Tmp := big.NewInt(0)
 	Tmp.Neg(e.value)
-	Tmp.Mod(Tmp, x.curve.P)
+	Tmp.Mod(Tmp, x.curveParam.P)
 
-	return &ECFieldElement{Tmp, x.curve}
+	return &ECFieldElement{Tmp, x.curveParam}
 }
 
 func (e *ECFieldElement) Mul(x *ECFieldElement, y *ECFieldElement) *ECFieldElement {
 
 	Tmp := big.NewInt(0)
 	Tmp.Mul(x.value, y.value)
-	Tmp.Mod(Tmp, x.curve.P)
+	Tmp.Mod(Tmp, x.curveParam.P)
 	e.value.Set(Tmp)
 
-	return &ECFieldElement{Tmp, x.curve}
+	return &ECFieldElement{Tmp, x.curveParam}
 }
 
 func (e *ECFieldElement) MulBig(x *ECFieldElement, y *big.Int) *ECFieldElement {
 
 	Tmp := big.NewInt(0)
 	Tmp.Mul(x.value, y)
-	Tmp.Mod(Tmp, x.curve.P)
+	Tmp.Mod(Tmp, x.curveParam.P)
 	e.value.Set(Tmp)
 
-	return &ECFieldElement{Tmp, x.curve}
+	return &ECFieldElement{Tmp, x.curveParam}
 }
 
 func (e *ECFieldElement) Div(x *ECFieldElement, y *ECFieldElement) *ECFieldElement {
 
 	Tmp := big.NewInt(0)
 	Tmp1 := big.NewInt(0)
-	Tmp1.ModInverse(y.value, x.curve.P)
+	Tmp1.ModInverse(y.value, x.curveParam.P)
 	Tmp.Mul(x.value, Tmp1)
-	Tmp.Mod(Tmp, x.curve.P)
+	Tmp.Mod(Tmp, x.curveParam.P)
 
 	e.value.Set(Tmp)
-	return &ECFieldElement{Tmp, x.curve}
+	return &ECFieldElement{Tmp, x.curveParam}
 }
 
 func (e *ECFieldElement) DivBig(x *ECFieldElement, y *big.Int) *ECFieldElement {
 
 	Tmp := big.NewInt(0)
 	Tmp1 := big.NewInt(0)
-	Tmp1.ModInverse(y, x.curve.P)
+	Tmp1.ModInverse(y, x.curveParam.P)
 	Tmp.Mul(x.value, Tmp1)
-	Tmp.Mod(Tmp, x.curve.P)
+	Tmp.Mod(Tmp, x.curveParam.P)
 
 	e.value.Set(Tmp)
-	return &ECFieldElement{Tmp, x.curve}
+	return &ECFieldElement{Tmp, x.curveParam}
 }
 
 func (e *ECFieldElement) Add(x *ECFieldElement, y *ECFieldElement) *ECFieldElement {
 
 	Tmp := big.NewInt(0)
 	Tmp.Add(x.value, y.value)
-	Tmp.Mod(Tmp, x.curve.P)
+	Tmp.Mod(Tmp, x.curveParam.P)
 	e.value.Set(Tmp)
-	return &ECFieldElement{Tmp, x.curve}
+	return &ECFieldElement{Tmp, x.curveParam}
 }
 
 func (e *ECFieldElement) AddBig(x *ECFieldElement, y *big.Int) *ECFieldElement {
 
 	Tmp := big.NewInt(0)
 	Tmp.Add(x.value, y)
-	Tmp.Mod(Tmp, x.curve.P)
+	Tmp.Mod(Tmp, x.curveParam.P)
 	e.value.Set(Tmp)
-	return &ECFieldElement{Tmp, x.curve}
+	return &ECFieldElement{Tmp, x.curveParam}
 }
 
 func (e *ECFieldElement) Sub(x *ECFieldElement, y *ECFieldElement) *ECFieldElement {
 
 	Tmp := big.NewInt(0)
 	Tmp.Sub(x.value, y.value)
-	Tmp.Mod(Tmp, x.curve.P)
+	Tmp.Mod(Tmp, x.curveParam.P)
 	e.value.Set(Tmp)
-	return &ECFieldElement{Tmp, x.curve}
+	return &ECFieldElement{Tmp, x.curveParam}
 }
 
 func (e *ECFieldElement) SubBig(x *ECFieldElement, y *big.Int) *ECFieldElement {
 
 	Tmp := big.NewInt(0)
 	Tmp.Sub(x.value, y)
-	Tmp.Mod(Tmp, x.curve.P)
+	Tmp.Mod(Tmp, x.curveParam.P)
 	e.value.Set(Tmp)
-	return &ECFieldElement{Tmp, x.curve}
+	return &ECFieldElement{Tmp, x.curveParam}
 }
