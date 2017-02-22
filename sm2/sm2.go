@@ -24,7 +24,7 @@ type ecdsaSignature struct {
 //-----------------------------------------------------------------------------
 
 func Init() {
-	InitSecp256r1()
+	InitSecpSm2()
 }
 
 func Sha256(value []byte) []byte {
@@ -90,9 +90,20 @@ func NewGenKeyPair() (*PrivateKey, *PublicKey, error) {
 
 	k, _ := RandomNum(32)
 
+	// here used a fixed value for testing
+	byteArr := [...]byte{0x84, 0x87, 0x00, 0x91, 0xE4, 0xDC, 0x0F, 0x73, 0x82, 0x84, 0x8D, 0xBF, 0x15, 0x00, 0xCF, 0x73, 0x24, 0xFE, 0xF2, 0x7A, 0x78, 0x89, 0x94, 0xF9, 0xEC, 0xD1, 0xA2, 0x05, 0x77, 0xCD, 0xB7, 0x6F}
+	copy(k, byteArr[0:])
+	//------------------------------------
+
 	mprikey.d = big.NewInt(0).SetBytes(k)
+
+	mpubkey.pbkey = NewECPoint()
 	mpubkey.pbkey.Mul(G, k)
 	mprikey.pbkey = mpubkey.pbkey
+
+	PrintHex("prikey", mprikey.d.Bytes(), len(mprikey.d.Bytes()))
+	PrintHex("pbkeyX", mpubkey.pbkey.X.value.Bytes(), len(mpubkey.pbkey.X.value.Bytes()))
+	PrintHex("pbkeyY", mpubkey.pbkey.Y.value.Bytes(), len(mpubkey.pbkey.Y.value.Bytes()))
 
 	return mprikey, mpubkey, nil
 }
@@ -221,4 +232,31 @@ func Verify(message []byte, publicKey *PublicKey, r *big.Int, s *big.Int) bool {
 	v.Mod(point.X.value, Ecurve.N)
 
 	return (v.Cmp(r) == 0)
+}
+
+// TestPointEncode function.
+func TestPointEncode() {
+	Init()
+
+	k1, _ := RandomNum(32)
+	k2, _ := RandomNum(32)
+
+	ap := NewECPoint()
+
+	ap.X.value.SetBytes(k1)
+	ap.Y.value.SetBytes(k2)
+
+	fmt.Println("ap.X: ", ap.X.value)
+	fmt.Println("ap.Y: ", ap.Y.value)
+
+	ap.X.curveParam = Ecurve
+	ap.Y.curveParam = Ecurve
+
+	ap.curve = Ecurve
+
+	encAp := ap.EncodePoint(true)
+
+	bp := DecodePoint(encAp, Ecurve)
+	fmt.Println("bp.X: ", bp.X.value)
+	fmt.Println("bp.Y: ", bp.Y.value)
 }

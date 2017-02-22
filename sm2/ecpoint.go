@@ -3,24 +3,39 @@ package sm2
 import (
 	"fmt"
 	"math/big"
-	//"os"
 )
 
-//----------------------------------------------------------------------
-
+// ECPoint
 type ECPoint struct {
 	X, Y  *ECFieldElement
 	curve *ECCurveParams
 }
 
-func NewECPoint() *ECPoint {
-	/*
-		bnx := big.NewInt(0)
-		bny := big.NewInt(0)
+func PrintHex(str string, bt []byte, length int) {
+	fmt.Println(str, "Length = ", length)
+	for i := 0; i < length; i++ {
+		if i%16 == 0 && i != 0 {
+			fmt.Println()
+		}
+		fmt.Printf("0x%02x ", bt[i])
+	}
+	fmt.Println(" ")
+	fmt.Println(" ")
+}
 
-		x := &ECFieldElement{bnx, Ecurve}
-		y := &ECFieldElement{bny, Ecurve}
-	*/
+func PrintHexEx(str string, bt []byte, length int) {
+	fmt.Println(str, "Length = ", length)
+	for i := 0; i < length; i++ {
+		if i%16 == 0 && i != 0 {
+			fmt.Println()
+		}
+		fmt.Printf("%02x", bt[i])
+	}
+	fmt.Println(" ")
+	fmt.Println(" ")
+}
+
+func NewECPoint() *ECPoint {
 
 	x := NewECFieldElement()
 	y := NewECFieldElement()
@@ -39,25 +54,23 @@ func DumpECPoint(dst *ECPoint, src *ECPoint) {
 func (e *ECPoint) IsInfinity() bool {
 	if e.X == nil && e.Y == nil {
 		return true
-	} else {
-		return false
 	}
+	return false
 }
 
 func (e *ECPoint) GetSize() int {
 	if e.IsInfinity() {
 		return 1
-	} else {
-		return 33
 	}
+	return 33
+
 }
 
 func (e *ECPoint) CompareTo(other *ECPoint) int {
 	if e.X.value.Cmp(other.X.value) == 0 && e.Y.value.Cmp(other.Y.value) == 0 {
 		return 0
-	} else {
-		return 1
 	}
+	return 1
 }
 
 func DecompressPoint(yTilde int64, X1 *big.Int, curve *ECCurveParams) *ECPoint {
@@ -107,13 +120,14 @@ func DecodePoint(encoded []byte, curve *ECCurveParams) *ECPoint {
 				fmt.Println("Incorrect length for infinity encoding", "encoded")
 			}
 			yTilde := encoded[0] & 1
+
 			tmp := make([]byte, len(encoded)-1)
 			copy(tmp, encoded[1:])
 			Reverse(tmp)
-			tmp1 := make([]byte, len(tmp)+1)
-			copy(tmp1, tmp)
+			PrintHex("xBytes", tmp, len(tmp))
 
-			X1 := new(big.Int).SetBytes(tmp1)
+			X1 := new(big.Int).SetBytes(tmp)
+
 			p = DecompressPoint(int64(yTilde), X1, curve)
 		}
 	case 0x04, 0x06, 0x07: // uncompressed, hybrid, hybrid
@@ -122,17 +136,21 @@ func DecodePoint(encoded []byte, curve *ECCurveParams) *ECPoint {
 				fmt.Println("Incorrect length for uncompressed/hybrid encoding", "encoded")
 			}
 
-			Tmp1 := encoded[1 : 1+expectedLength]
-			Reverse(Tmp1)
-			Tmp2 := make([]byte, len(Tmp1)+1)
-			copy(Tmp2, Tmp1)
-			X1 := new(big.Int).SetBytes(Tmp2)
+			tmp1 := encoded[1 : 1+expectedLength]
+			tmp2 := make([]byte, len(tmp1))
+			copy(tmp2, tmp1)
+			Reverse(tmp2)
 
-			Tmp3 := encoded[1:]
-			Reverse(Tmp3)
-			Tmp4 := make([]byte, len(Tmp3)+1)
-			copy(Tmp4, Tmp3)
-			Y1 := new(big.Int).SetBytes(Tmp4)
+			PrintHex("tmp2", tmp2, len(tmp2))
+			X1 := new(big.Int).SetBytes(tmp2)
+
+			tmp3 := encoded[1+expectedLength:]
+			tmp4 := make([]byte, len(tmp3))
+			copy(tmp4, tmp3)
+			Reverse(tmp4)
+
+			PrintHex("tmp4", tmp4, len(tmp4))
+			Y1 := new(big.Int).SetBytes(tmp4)
 
 			Ex := &ECFieldElement{X1, curve}
 			Ey := &ECFieldElement{Y1, curve}
@@ -146,9 +164,9 @@ func DecodePoint(encoded []byte, curve *ECCurveParams) *ECPoint {
 
 func (e *ECPoint) EncodePoint(compressed bool) []byte {
 	if e.IsInfinity() {
-		Tmp := make([]byte, 1)
+		tmp := make([]byte, 1)
 		fmt.Println("IsInfinity")
-		return Tmp
+		return tmp
 	}
 
 	var data []byte
@@ -159,17 +177,11 @@ func (e *ECPoint) EncodePoint(compressed bool) []byte {
 		data = make([]byte, 65)
 
 		yBytes := e.Y.value.Bytes()
-		PrintHex("yBytes", yBytes, len(yBytes))
 
 		tmp := make([]byte, len(yBytes))
 		copy(tmp, yBytes)
-		PrintHex("tmp", tmp, len(tmp))
-
 		Reverse(tmp)
-		PrintHex("tmp", tmp, len(tmp))
-
 		copy(data[65-len(yBytes):], tmp)
-		PrintHex("data", data, 65)
 	}
 
 	xBytes := e.X.value.Bytes()
@@ -177,13 +189,9 @@ func (e *ECPoint) EncodePoint(compressed bool) []byte {
 
 	tmp := make([]byte, len(xBytes))
 	copy(tmp, xBytes)
-	PrintHex("tmp", tmp, len(tmp))
-
 	Reverse(tmp)
-	PrintHex("tmp", tmp, len(tmp))
 
 	copy(data[33-len(tmp):], tmp)
-	PrintHex("data", data, len(data))
 
 	if !compressed {
 		data[0] = 0x04
@@ -211,17 +219,17 @@ func (e *ECPoint) Equals(other *ECPoint) bool {
 
 	if e.CompareTo(other) == 0 {
 		return true
-	} else {
-		return false
 	}
+	return false
 }
 
+// Twice ---
 func (e *ECPoint) Twice() *ECPoint {
 	if e.IsInfinity() {
 		return e
 	}
 	if e.Y.value.Sign() == 0 {
-		return Infinity
+		return e
 	}
 
 	TWO := &ECFieldElement{big.NewInt(2), e.curve}
@@ -234,12 +242,14 @@ func (e *ECPoint) Twice() *ECPoint {
 	Tmp2.MulBig(THREE, Tmp1)
 	Tmp2.AddBig(Tmp2, e.curve.A)
 
-	Tmp3 := TWO.MulBig(TWO, e.Y.value)
+	Tmp3 := NewECFieldElement()
+	Tmp3.MulBig(TWO, e.Y.value)
 
 	gamma := Tmp2.Div(Tmp2, Tmp3)
 
 	Tmp4 := gamma.Square()
-	Tmp5 := TWO.MulBig(TWO, e.X.value)
+	Tmp5 := NewECFieldElement()
+	Tmp5.MulBig(TWO, e.X.value)
 	x3 := Tmp4.Sub(Tmp4, Tmp5)
 
 	y3 := &ECFieldElement{big.NewInt(0), e.curve}
@@ -279,62 +289,122 @@ func Multiply(p *ECPoint, k *big.Int) *ECPoint {
 		reqPreCompLen = 127
 	}
 	preCompLen := 1
+	fmt.Println("reqPreCompLen = ", reqPreCompLen)
 
-	preComp := make([]ECPoint, reqPreCompLen)
+	preComp := make([]*ECPoint, reqPreCompLen)
+	for i := 0; i < reqPreCompLen; i++ {
+		preComp[i] = NewECPoint()
+	}
+
+	DumpECPoint(preComp[0], p)
+
+	// vpX := p.X.value.Bytes()
+	// vpY := p.Y.value.Bytes()
+	// PrintHex("p point", vpX, len(vpX))
+	// PrintHex("p point", vpY, len(vpY))
+
 	twiceP := p.Twice()
 
+	// vX := twiceP.X.value.Bytes()
+	// vY := twiceP.Y.value.Bytes()
+	// PrintHex("twiceP point", vX, len(vX))
+	// PrintHex("twiceP point", vY, len(vY))
+
 	if preCompLen < reqPreCompLen {
-		oldPreComp := preComp
-		preComp := make([]ECPoint, reqPreCompLen)
-		copy(preComp, oldPreComp)
+		oldPreComp := NewECPoint()
+		DumpECPoint(oldPreComp, preComp[0])
+		DumpECPoint(preComp[0], oldPreComp)
 
-		i := preCompLen
-
-		for i < reqPreCompLen {
-			preComp[i].Add(twiceP, &preComp[i-1])
-			i++
+		for i := preCompLen; i < reqPreCompLen; i++ {
+			preComp[i].Add(twiceP, preComp[i-1])
 		}
 	}
+	// fmt.Println("width:=====", width)
+	// PrintHex("k", k.Bytes(), len(k.Bytes()))
 
 	wnaf := WindowNaf(width, k)
 	l := len(wnaf)
+	//PrintHex("wnaf", wnaf, l)
+	//q := &ECPoint(nil, nil, Ecurve)
 
-	q := Infinity
-	i := l - 1
-	for i >= 0 {
+	//q := &ECPoint{nil, nil, Ecurve}
+	//q := NewECPoint()
+	//DumpECPoint(q, Infinity)
+	q := NewECPoint()
+	for i := l - 1; i >= 0; i-- {
 		q = q.Twice()
-		if wnaf[i] != 0 {
-			if wnaf[i] > 0 {
+		id := wnaf[i]
+		if id != 0 {
+			if id > 0 {
+				index := (id - 1) / 2
+				//fmt.Println("i：===", i, "index========", index)
 
-				q.Add(q, &preComp[(wnaf[i]-1)/2])
+				// fmt.Println("----------------------------------")
+				// PrintHex("preComp[index]X", preComp[index].X.value.Bytes(), len(preComp[index].X.value.Bytes()))
+				// fmt.Println("----------------------------------")
+				// PrintHex("preComp[index]Y", preComp[index].Y.value.Bytes(), len(preComp[index].Y.value.Bytes()))
+
+				q.Add(q, preComp[index])
+
+				// fmt.Println("----------------------------------")
+				// PrintHex("pbkeyX", q.X.value.Bytes(), len(q.X.value.Bytes()))
+				// fmt.Println("----------------------------------")
+				// PrintHex("pbkeyY", q.Y.value.Bytes(), len(q.Y.value.Bytes()))
+				// os.Exit(0)
+			} else {
+				index := (-id - 1) / 2
+				// fmt.Println("i：===", i, "index========", index)
+
+				// fmt.Println("----------------------------------")
+				// PrintHex("pbkeyX", q.X.value.Bytes(), len(q.X.value.Bytes()))
+				// fmt.Println("----------------------------------")
+				// PrintHex("pbkeyY", q.Y.value.Bytes(), len(q.Y.value.Bytes()))
+
+				q.Sub(q, preComp[index])
+
+				// fmt.Println("----------------------------------")
+				// PrintHex("pbkeyX", q.X.value.Bytes(), len(q.X.value.Bytes()))
+				// fmt.Println("----------------------------------")
+				// PrintHex("pbkeyY", q.Y.value.Bytes(), len(q.Y.value.Bytes()))
+				// os.Exit(0)
 			}
 		}
-		i--
+		// fmt.Println("----------------------------------")
+		// PrintHex("pbkeyX", q.X.value.Bytes(), len(q.X.value.Bytes()))
+		// fmt.Println("----------------------------------")
+		// PrintHex("pbkeyY", q.Y.value.Bytes(), len(q.Y.value.Bytes()))
 	}
-
+	fmt.Println("----------------------------------")
+	PrintHex("pbkeyX", q.X.value.Bytes(), len(q.X.value.Bytes()))
+	fmt.Println("----------------------------------")
+	PrintHex("pbkeyY", q.Y.value.Bytes(), len(q.Y.value.Bytes()))
 	return q
 
 }
 
-func WindowNaf(width byte, k *big.Int) []byte {
-	wnaf := make([]byte, k.BitLen()+1)
+// WindowNaf ---
+func WindowNaf(width byte, k *big.Int) []int8 {
+	wnaf := make([]int8, k.BitLen()+1)
 	var pow2wB uint16
 
 	pow2wB = 1 << width
-	i := 0
+
 	length := 0
 	bigp2wB := big.NewInt(int64(pow2wB))
 	Tmp := big.NewInt(0)
 
-	for k.Sign() > 0 {
+	for i := 0; k.Sign() > 0; i++ {
 		if !IsEven(k) {
 			remainder := big.NewInt(0)
 			remainder.Mod(k, bigp2wB)
 			if remainder.Bit(int(width-1)) == 1 {
 				Tmp.Sub(remainder, bigp2wB)
-				wnaf[i] = byte(Tmp.Int64())
+
+				wnaf[i] = int8(Tmp.Int64())
+
 			} else {
-				wnaf[i] = byte(remainder.Int64())
+				wnaf[i] = int8(remainder.Int64())
+
 			}
 			k.Sub(k, big.NewInt(int64(wnaf[i])))
 			length = i
@@ -342,16 +412,18 @@ func WindowNaf(width byte, k *big.Int) []byte {
 			wnaf[i] = 0
 		}
 		k.Rsh(k, 1)
-		i++
 	}
 	length++
-	wnafShort := make([]byte, length)
-	copy(wnafShort, wnaf)
+	wnafShort := make([]int8, length)
+	copy(wnafShort, wnaf[0:length])
 	return wnafShort
 }
 
+// Neg ---
 func (e *ECPoint) Neg(x *ECPoint) *ECPoint {
-	return &ECPoint{x.X, x.Y.Neg(x.Y), x.curve}
+	negY := NewECFieldElement()
+	negY.Neg(x.Y)
+	return &ECPoint{x.X, negY, x.curve}
 }
 
 func (e *ECPoint) Mul(p *ECPoint, n []byte) *ECPoint {
@@ -364,56 +436,83 @@ func (e *ECPoint) Mul(p *ECPoint, n []byte) *ECPoint {
 	if p.IsInfinity() {
 		return p
 	}
+	//vX := p.X.value.Bytes()
+	//vY := p.Y.value.Bytes()
+	//PrintHex("p point", []byte(vX), len(vX))
+	//PrintHex("p point", []byte(vY), len(vY))
+
 	k := big.NewInt(0)
 	l := len(n)
 	Tmp1 := make([]byte, l)
 
 	copy(Tmp1, n)
 	Reverse(Tmp1)
-	Tmp2 := make([]byte, l+1)
-	copy(Tmp2, n)
+	//Tmp2 := make([]byte, l+1)
+	//copy(Tmp2, Tmp1)
 
-	k.SetBytes(Tmp2)
+	k.SetBytes(Tmp1)
+	kbts := k.Bytes()
+	PrintHex("kbts", kbts, len(kbts))
+
 	if k.Sign() == 0 {
 		return Infinity
 	}
-	return Multiply(p, k)
+
+	nP := Multiply(p, k)
+	DumpECPoint(e, nP)
+	return nP
 }
 
+// Add ---
 func (e *ECPoint) Add(x *ECPoint, y *ECPoint) *ECPoint {
 	if x.IsInfinity() {
+		DumpECPoint(e, y)
 		return y
 	}
 	if y.IsInfinity() {
+		DumpECPoint(e, y)
 		return x
 	}
 	if x.X.Equals(y.X) {
 		if x.Y.Equals(y.Y) {
-			return x.Twice()
+			twcX := x.Twice()
+			DumpECPoint(e, twcX)
+			return twcX
 		}
 		return Infinity
 	}
-	Tmp1 := new(ECFieldElement)
+	Tmp1 := NewECFieldElement()
 	Tmp1.Sub(y.Y, x.Y)
-	Tmp2 := new(ECFieldElement)
+	Tmp2 := NewECFieldElement()
 	Tmp2.Sub(y.X, x.X)
-	gama := Tmp1.Div(Tmp1, Tmp2)
+	gama := NewECFieldElement()
+	gama.Div(Tmp1, Tmp2)
 
 	x3 := gama.Square()
 	x3.Sub(x3, x.X)
 	x3.Sub(x3, y.X)
 
-	y3 := x.X.Sub(x.X, x3)
+	y3 := NewECFieldElement()
+	y3.Sub(x.X, x3)
 	y3.Mul(y3, gama)
 	y3.Sub(y3, x.Y)
 
-	return &ECPoint{x3, y3, x.curve}
+	ret := &ECPoint{x3, y3, x.curve}
+	DumpECPoint(e, ret)
+	return ret
 
 }
 
+// Sub ---
 func (e *ECPoint) Sub(x *ECPoint, y *ECPoint) *ECPoint {
 	if y.IsInfinity() {
 		return x
 	}
-	return x.Add(x, y.Neg(y))
+	tmp := NewECPoint()
+	tmp.Neg(y)
+	tmp.Add(tmp, x)
+
+	DumpECPoint(e, tmp)
+
+	return tmp
 }

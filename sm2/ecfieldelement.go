@@ -19,9 +19,10 @@ func NewECFieldElement() *ECFieldElement {
 }
 
 func DumpECFieldElement(dst *ECFieldElement, src *ECFieldElement) {
-
-	dst.value.Set(src.value)
-	dst.curveParam = src.curveParam
+	if nil != dst && nil != src {
+		dst.value.Set(src.value)
+		dst.curveParam = src.curveParam
+	}
 }
 
 func GetLowestSetBit(k *big.Int) int {
@@ -137,22 +138,22 @@ func IsEven(k *big.Int) bool {
 
 func Reverse(data []byte) {
 
-	len1 := len(data)
+	// len1 := len(data)
 
-	for i := 0; i < len1/2; i++ {
-		Tmp := data[i]
-		data[i] = data[len1-1-i]
-		data[len1-1-i] = Tmp
-	}
+	// for i := 0; i < len1/2; i++ {
+	// 	Tmp := data[i]
+	// 	data[i] = data[len1-1-i]
+	// 	data[len1-1-i] = Tmp
+	// }
 }
 
 func ReverseLen(data []byte, length int) {
 
-	for i := 0; i < length/2; i++ {
-		Tmp := data[i]
-		data[i] = data[length-1-i]
-		data[length-1-i] = Tmp
-	}
+	// for i := 0; i < length/2; i++ {
+	// 	Tmp := data[i]
+	// 	data[i] = data[length-1-i]
+	// 	data[length-1-i] = Tmp
+	// }
 }
 
 func (e *ECFieldElement) CompareTo(other *ECFieldElement) int {
@@ -172,6 +173,7 @@ func (e *ECFieldElement) Equals(other *ECFieldElement) bool {
 	return (e.value.Cmp(other.value) == 0)
 }
 
+// Square ---
 func (e *ECFieldElement) Square() *ECFieldElement {
 
 	Tmp := big.NewInt(0)
@@ -181,6 +183,7 @@ func (e *ECFieldElement) Square() *ECFieldElement {
 	return &ECFieldElement{Tmp, e.curveParam}
 }
 
+// Sqrt must be fixed
 func (e *ECFieldElement) Sqrt() *ECFieldElement {
 	if e.curveParam.P.Bit(1) == 1 {
 		Tmp1 := big.NewInt(0)
@@ -269,6 +272,7 @@ func (e *ECFieldElement) Sqrt() *ECFieldElement {
 	return nil
 }
 
+// ToByteArray --- NoUsed
 func (e *ECFieldElement) ToByteArray() []byte {
 
 	data := e.value.Bytes()
@@ -290,6 +294,7 @@ func (e *ECFieldElement) ToByteArray() []byte {
 	return data2
 }
 
+// Neg ---
 func (e *ECFieldElement) Neg(x *ECFieldElement) *ECFieldElement {
 
 	Tmp := big.NewInt(0)
@@ -299,6 +304,7 @@ func (e *ECFieldElement) Neg(x *ECFieldElement) *ECFieldElement {
 	return &ECFieldElement{Tmp, x.curveParam}
 }
 
+// Mul ---
 func (e *ECFieldElement) Mul(x *ECFieldElement, y *ECFieldElement) *ECFieldElement {
 
 	Tmp := big.NewInt(0)
@@ -309,6 +315,7 @@ func (e *ECFieldElement) Mul(x *ECFieldElement, y *ECFieldElement) *ECFieldEleme
 	return &ECFieldElement{Tmp, x.curveParam}
 }
 
+// MulBig ---
 func (e *ECFieldElement) MulBig(x *ECFieldElement, y *big.Int) *ECFieldElement {
 
 	Tmp := big.NewInt(0)
@@ -319,6 +326,7 @@ func (e *ECFieldElement) MulBig(x *ECFieldElement, y *big.Int) *ECFieldElement {
 	return &ECFieldElement{Tmp, x.curveParam}
 }
 
+// Div ---？？？
 func (e *ECFieldElement) Div(x *ECFieldElement, y *ECFieldElement) *ECFieldElement {
 
 	Tmp := big.NewInt(0)
@@ -331,6 +339,7 @@ func (e *ECFieldElement) Div(x *ECFieldElement, y *ECFieldElement) *ECFieldEleme
 	return &ECFieldElement{Tmp, x.curveParam}
 }
 
+// DivBig ---？？？
 func (e *ECFieldElement) DivBig(x *ECFieldElement, y *big.Int) *ECFieldElement {
 
 	Tmp := big.NewInt(0)
@@ -343,38 +352,46 @@ func (e *ECFieldElement) DivBig(x *ECFieldElement, y *big.Int) *ECFieldElement {
 	return &ECFieldElement{Tmp, x.curveParam}
 }
 
+// Add ---
 func (e *ECFieldElement) Add(x *ECFieldElement, y *ECFieldElement) *ECFieldElement {
 
 	Tmp := big.NewInt(0)
 	Tmp.Add(x.value, y.value)
 	Tmp.Mod(Tmp, x.curveParam.P)
+
 	e.value.Set(Tmp)
 	return &ECFieldElement{Tmp, x.curveParam}
 }
 
+// AddBig ---
 func (e *ECFieldElement) AddBig(x *ECFieldElement, y *big.Int) *ECFieldElement {
 
 	Tmp := big.NewInt(0)
 	Tmp.Add(x.value, y)
 	Tmp.Mod(Tmp, x.curveParam.P)
+
 	e.value.Set(Tmp)
 	return &ECFieldElement{Tmp, x.curveParam}
 }
 
+// Sub ---
 func (e *ECFieldElement) Sub(x *ECFieldElement, y *ECFieldElement) *ECFieldElement {
 
 	Tmp := big.NewInt(0)
 	Tmp.Sub(x.value, y.value)
 	Tmp.Mod(Tmp, x.curveParam.P)
+
 	e.value.Set(Tmp)
 	return &ECFieldElement{Tmp, x.curveParam}
 }
 
+// SubBig ---
 func (e *ECFieldElement) SubBig(x *ECFieldElement, y *big.Int) *ECFieldElement {
 
 	Tmp := big.NewInt(0)
 	Tmp.Sub(x.value, y)
 	Tmp.Mod(Tmp, x.curveParam.P)
+
 	e.value.Set(Tmp)
 	return &ECFieldElement{Tmp, x.curveParam}
 }
