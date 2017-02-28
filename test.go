@@ -3,8 +3,8 @@ package main
 import (
 	"GoSm2/sm2"
 	"fmt"
-	"math/big"
 	"os"
+	"time"
 )
 
 func PrintHex(str string, bt []byte, length int) {
@@ -19,66 +19,37 @@ func PrintHex(str string, bt []byte, length int) {
 	fmt.Println(" ")
 }
 
-func reverse(data []byte) {
-	len1 := len(data)
-	for i := 0; i < len1/2; i++ {
-		tmp := data[i]
-		data[i] = data[len1-i-1]
-		data[len1-i-1] = tmp
-	}
-}
-
-func test() {
-
-	z, _ := new(big.Int).SetString("917049492264781353612408419258525201475102643932529502393738587225651523777317", 10)
-	sz := z.Bytes()
-
-	dBytes := make([]byte, 32)
-	copy(dBytes, sz)
-	//reverse(dBytes)
-
-	PrintHex("dBytes", dBytes, len(dBytes))
-	/*
-		a := big.NewInt(1*16 + 2*16*16 + 3*16*16*16)
-		bt := a.Bytes()
-		PrintHex("a", bt, len(bt))
-
-		v := []byte{0x32, 0x10}
-		b := big.NewInt(0)
-		b.SetBytes(v)
-		fmt.Println(b.Int64())
-
-		sv := b.Bytes()
-		PrintHex("sv", sv, len(sv))*/
-}
-
 func main() {
-	//test()
-	//sm2.TestPointEncode()
-
 	sm2.Init()
+	buf := "This is a message to be signed and verified by SM2!"
 
-	prikey, pubkey, err := sm2.NewGenKeyPair()
+	priKey, x, y, err := sm2.GenKeyPair()
 	if err != nil {
 		fmt.Println(err)
 		os.Exit(1)
 	}
 
-	buf := "This is a message to be signed and verified by ECDSA!"
-	// Sign ecdsa style
+	t1 := time.Now()
+	for i := 0; i < 10; i++ {
+		r, s, serr := sm2.Sign(priKey, []byte(buf))
+		if nil != serr {
+			fmt.Println(serr)
+			os.Exit(1)
+		}
 
-	signature, err := sm2.Sign(prikey, []byte(buf))
-	if err != nil {
-		fmt.Println(err)
-		os.Exit(1)
-	}
-	fmt.Printf("Signature : %x\n", signature)
+		PrintHex("R", r.Bytes(), len(r.Bytes()))
+		PrintHex("S", s.Bytes(), len(s.Bytes()))
 
-	// Verify
-	verifystatus := sm2.Verify([]byte(buf), pubkey, &signature[0], &signature[1])
-	if err != nil {
-		fmt.Println(err)
-		os.Exit(1)
+		status, _ := sm2.Verify(x, y, []byte(buf), r, s)
+		if true != status {
+			fmt.Println("Verify Failed")
+			os.Exit(1)
+		}
+		fmt.Println(status) // should be true
 	}
-	fmt.Println(verifystatus) // should be true
+
+	t2 := time.Now()
+	d := t2.Sub(t1)
+	fmt.Println(d)
+
 }

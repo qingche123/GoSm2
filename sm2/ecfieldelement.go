@@ -1,6 +1,7 @@
 package sm2
 
 import (
+	"crypto/elliptic"
 	"crypto/rand"
 	"fmt"
 	"math/big"
@@ -8,14 +9,12 @@ import (
 
 type ECFieldElement struct {
 	value      *big.Int
-	curveParam *ECCurveParams
+	curveParam *CurveParams
 }
 
 func NewECFieldElement() *ECFieldElement {
-
-	bnx := big.NewInt(0)
-
-	return &ECFieldElement{bnx, Ecurve}
+	fieldValue := big.NewInt(0)
+	return &ECFieldElement{fieldValue, EccParams}
 }
 
 func DumpECFieldElement(dst *ECFieldElement, src *ECFieldElement) {
@@ -25,247 +24,193 @@ func DumpECFieldElement(dst *ECFieldElement, src *ECFieldElement) {
 	}
 }
 
-func GetLowestSetBit(k *big.Int) int {
+func isEven(bn *big.Int) bool {
+	v := big.NewInt(0)
+	v.Mod(bn, big.NewInt(2))
+	if 0 == v.Int64() {
+		return true
+	}
+	return false
+}
+
+func getLowestSetBit(k *big.Int) int {
 	i := 0
 	for i = 0; k.Bit(i) != 1; i++ {
 	}
 	return i
 }
 
-func FastLucasSequence(A, B, C, k *big.Int) []big.Int {
+// fastLucasSequence refer to https://en.wikipedia.org/wiki/Lucas_sequence
+func fastLucasSequence(curveP, lucasParamP, lucasParamQ, k *big.Int) (*big.Int,
+	*big.Int) {
 	n := k.BitLen()
-	s := GetLowestSetBit(k)
+	s := getLowestSetBit(k)
 
-	Uh := big.NewInt(1)
-	Vl := big.NewInt(2)
-	Ql := big.NewInt(1)
-	Qh := big.NewInt(1)
-	Vh := big.NewInt(0)
-	Tmp := big.NewInt(0)
-
-	Vh.Set(B)
+	uh := big.NewInt(1)
+	vl := big.NewInt(2)
+	ql := big.NewInt(1)
+	qh := big.NewInt(1)
+	vh := big.NewInt(0).Set(lucasParamP)
+	tmp := big.NewInt(0)
 
 	for j := n - 1; j >= s+1; j-- {
-		Ql.Mul(Ql, Qh)
-		Ql.Mod(Ql, A)
+		ql.Mul(ql, qh)
+		ql.Mod(ql, curveP)
 
 		if k.Bit(j) == 1 {
-			Qh.Mul(Ql, C)
-			Qh.Mod(Qh, A)
+			qh.Mul(ql, lucasParamQ)
+			qh.Mod(qh, curveP)
 
-			Uh.Mul(Uh, Vh)
-			Uh.Mod(Uh, A)
+			uh.Mul(uh, vh)
+			uh.Mod(uh, curveP)
 
-			Vl.Mul(Vh, Vl)
-			Tmp.Mul(B, Ql)
-			Vl.Sub(Vl, Tmp)
-			Vl.Mod(Vl, A)
+			vl.Mul(vh, vl)
+			tmp.Mul(lucasParamP, ql)
+			vl.Sub(vl, tmp)
+			vl.Mod(vl, curveP)
 
-			Vh.Mul(Vh, Vh)
-			Tmp.Lsh(Qh, 1)
-			Vh.Sub(Vh, Tmp)
-			Vh.Mod(Vh, A)
+			vh.Mul(vh, vh)
+			tmp.Lsh(qh, 1)
+			vh.Sub(vh, tmp)
+			vh.Mod(vh, curveP)
 
 		} else {
-			Qh.Set(Ql)
+			qh.Set(ql)
 
-			Uh.Mul(Uh, Vl)
-			Uh.Sub(Uh, Ql)
-			Uh.Mod(Uh, A)
+			uh.Mul(uh, vl)
+			uh.Sub(uh, ql)
+			uh.Mod(uh, curveP)
 
-			Vh.Mul(Vh, Vl)
-			Tmp.Mul(B, Ql)
-			Vh.Sub(Vh, Tmp)
-			Vh.Mod(Vh, A)
+			vh.Mul(vh, vl)
+			tmp.Mul(lucasParamP, ql)
+			vh.Sub(vh, tmp)
+			vh.Mod(vh, curveP)
 
-			Vl.Mul(Vl, Vl)
-			Tmp.Lsh(Ql, 1)
-			Vl.Sub(Vl, Tmp)
-			Vl.Mod(Vl, A)
+			vl.Mul(vl, vl)
+			tmp.Lsh(ql, 1)
+			vl.Sub(vl, tmp)
+			vl.Mod(vl, curveP)
 		}
 	}
 
-	Ql.Mul(Ql, Qh)
-	Ql.Mod(Ql, A)
+	ql.Mul(ql, qh)
+	ql.Mod(ql, curveP)
 
-	Qh.Mul(Ql, C)
-	Qh.Mod(Qh, A)
+	qh.Mul(ql, lucasParamQ)
+	qh.Mod(qh, curveP)
 
-	Uh.Mul(Uh, Vl)
-	Uh.Sub(Uh, Ql)
-	Uh.Mod(Uh, A)
+	uh.Mul(uh, vl)
+	uh.Sub(uh, ql)
+	uh.Mod(uh, curveP)
 
-	Vl.Mul(Vh, Vl)
-	Tmp.Mul(B, Ql)
-	Vl.Sub(Vl, Tmp)
-	Vl.Mod(Vl, A)
+	vl.Mul(vh, vl)
+	tmp.Mul(lucasParamP, ql)
+	vl.Sub(vl, tmp)
+	vl.Mod(vl, curveP)
 
-	Ql.Mul(Ql, Qh)
-	Ql.Mod(Ql, A)
+	ql.Mul(ql, qh)
+	ql.Mod(ql, curveP)
 
 	for j := 1; j <= s; j++ {
-		Uh.Mul(Uh, Vl)
-		Uh.Mul(Uh, A)
+		uh.Mul(uh, vl)
+		uh.Mul(uh, curveP)
 
-		Vl.Mul(Vl, Vl)
-		Tmp.Lsh(Ql, 1)
-		Vl.Sub(Vl, Tmp)
-		Vl.Mod(Vl, A)
+		vl.Mul(vl, vl)
+		tmp.Lsh(ql, 1)
+		vl.Sub(vl, tmp)
+		vl.Mod(vl, curveP)
 
-		Ql.Mul(Ql, Ql)
-		Ql.Mod(Ql, A)
+		ql.Mul(ql, ql)
+		ql.Mod(ql, curveP)
 	}
 
-	//var Array [2]*big.Int
-	//Array = [2]*big.Int{Uh, Vl}
-
-	bnret := make([]big.Int, 2)
-	bnret[0] = *Uh
-	bnret[1] = *Vl
-
-	return bnret
-}
-
-func IsEven(k *big.Int) bool {
-	z := big.NewInt(0)
-	z.Mod(k, big.NewInt(2))
-	if z.Int64() == 0 {
-		return true
-	} else {
-		return false
-	}
-}
-
-func Reverse(data []byte) {
-
-	// len1 := len(data)
-
-	// for i := 0; i < len1/2; i++ {
-	// 	Tmp := data[i]
-	// 	data[i] = data[len1-1-i]
-	// 	data[len1-1-i] = Tmp
-	// }
-}
-
-func ReverseLen(data []byte, length int) {
-
-	// for i := 0; i < length/2; i++ {
-	// 	Tmp := data[i]
-	// 	data[i] = data[length-1-i]
-	// 	data[length-1-i] = Tmp
-	// }
-}
-
-func (e *ECFieldElement) CompareTo(other *ECFieldElement) int {
-	if e == other {
-		return 0
-	}
-	return e.value.Cmp(other.value)
-}
-
-func (e *ECFieldElement) Equals(other *ECFieldElement) bool {
-	if e == other {
-		return true
-	}
-	if other == nil {
-		return false
-	}
-	return (e.value.Cmp(other.value) == 0)
+	return uh, vl
 }
 
 // Square ---
 func (e *ECFieldElement) Square() *ECFieldElement {
+	eSquare := big.NewInt(0)
+	eSquare.Mul(e.value, e.value)
+	eSquare.Mod(eSquare, e.curveParam.P)
 
-	Tmp := big.NewInt(0)
-	Tmp.Mul(e.value, e.value)
-	Tmp.Mod(Tmp, e.curveParam.P)
-
-	return &ECFieldElement{Tmp, e.curveParam}
+	return &ECFieldElement{eSquare, e.curveParam}
 }
 
-// Sqrt must be fixed
-func (e *ECFieldElement) Sqrt() *ECFieldElement {
-	if e.curveParam.P.Bit(1) == 1 {
-		Tmp1 := big.NewInt(0)
-		Tmp1.Rsh(e.curveParam.P, 2)
-		Tmp1.Add(Tmp1, big.NewInt(1))
+// Sqrt - compute the coordinate of Y from Y**2
+func Sqrt(ySquare *big.Int, curve *elliptic.CurveParams) *big.Int {
+	if curve.P.Bit(1) == 1 {
+		tmp1 := big.NewInt(0)
+		tmp1.Rsh(curve.P, 2)
+		tmp1.Add(tmp1, big.NewInt(1))
 
-		Tmp2 := big.NewInt(0)
-		Tmp2.Exp(e.value, Tmp1, e.curveParam.P)
+		tmp2 := big.NewInt(0)
+		tmp2.Exp(ySquare, tmp1, curve.P)
 
-		z := &ECFieldElement{Tmp2, e.curveParam}
-		zsq := z.Square()
-		if zsq.Equals(e) {
-			return z
-		} else {
-			fmt.Println("error z^2 != z")
-			return nil
+		tmp3 := big.NewInt(0)
+		tmp3.Exp(tmp2, big.NewInt(2), curve.P)
+
+		if 0 == tmp3.Cmp(ySquare) {
+			return tmp2
 		}
+		fmt.Println("error z^2 != z")
+		return nil
 	}
 
 	qMinusOne := big.NewInt(0)
-	qMinusOne.Sub(e.curveParam.P, big.NewInt(1))
+	qMinusOne.Sub(curve.P, big.NewInt(1))
 
 	legendExponent := big.NewInt(0)
 	legendExponent.Rsh(qMinusOne, 1)
 
-	Tmp := big.NewInt(0)
-	Tmp.Exp(e.value, legendExponent, e.curveParam.P)
-	if Tmp.Cmp(big.NewInt(1)) != 0 {
+	tmp4 := big.NewInt(0)
+	tmp4.Exp(ySquare, legendExponent, curve.P)
+	if tmp4.Cmp(big.NewInt(1)) != 0 {
 		return nil
 	}
 
-	u := big.NewInt(0)
-	u.Rsh(qMinusOne, 2)
-
 	k := big.NewInt(0)
-	k.Lsh(u, 1)
+	k.Rsh(qMinusOne, 2)
+	k.Lsh(k, 1)
 	k.Add(k, big.NewInt(1))
 
-	Q := big.NewInt(0)
-	Q.Set(e.value)
+	lucasParamQ := big.NewInt(0)
+	lucasParamQ.Set(ySquare)
 	fourQ := big.NewInt(0)
-	fourQ.Lsh(Q, 2)
-	fourQ.Mod(fourQ, e.curveParam.P)
+	fourQ.Lsh(lucasParamQ, 2)
+	fourQ.Mod(fourQ, curve.P)
 
-	U := big.NewInt(0)
-	V := big.NewInt(0)
+	seqU := big.NewInt(0)
+	seqV := big.NewInt(0)
 
 	for {
-		P := big.NewInt(0)
+		lucasParamP := big.NewInt(0)
 		for {
-			Tmp1 := big.NewInt(0)
-			P, _ := rand.Prime(rand.Reader, e.curveParam.P.BitLen())
+			tmp5 := big.NewInt(0)
+			lucasParamP, _ = rand.Prime(rand.Reader, curve.P.BitLen())
 
-			if P.Cmp(e.curveParam.P) < 0 {
-				Tmp1.Mul(P, P)
-				Tmp1.Sub(Tmp1, fourQ)
-				Tmp1.Exp(Tmp1, legendExponent, e.curveParam.P)
-
-				if Tmp1.Cmp(qMinusOne) == 0 {
+			if lucasParamP.Cmp(curve.P) < 0 {
+				tmp5.Mul(lucasParamP, lucasParamP)
+				tmp5.Sub(tmp5, fourQ)
+				tmp5.Exp(tmp5, legendExponent, curve.P)
+				if tmp5.Cmp(qMinusOne) == 0 {
 					break
 				}
 			}
 		}
 
-		//var Array [2]*big.Int
-		result := FastLucasSequence(e.curveParam.P, P, Q, k)
+		seqU, seqV = fastLucasSequence(curve.P, lucasParamP, lucasParamQ, k)
 
-		U.Set(&result[0])
-		V.Set(&result[1])
-
-		Tmp2 := big.NewInt(0)
-		Tmp2.Mul(V, V)
-		Tmp2.Mod(Tmp2, e.curveParam.P)
-		if Tmp2.Cmp(fourQ) == 0 {
-			if V.Bit(0) == 1 {
-				V.Add(V, e.curveParam.P)
+		tmp6 := big.NewInt(0)
+		tmp6.Mul(seqV, seqV)
+		tmp6.Mod(tmp6, curve.P)
+		if tmp6.Cmp(fourQ) == 0 {
+			if seqV.Bit(0) == 1 {
+				seqV.Add(seqV, curve.P)
 			}
-			V.Rsh(V, 1)
-
-			return &ECFieldElement{V, e.curveParam}
+			seqV.Rsh(seqV, 1)
+			return seqV
 		}
-		if (U.Cmp(big.NewInt(0)) != 0) || (U.Cmp(qMinusOne) != 0) {
+		if (seqU.Cmp(big.NewInt(1)) == 0) || (seqU.Cmp(qMinusOne) == 0) {
 			break
 		}
 	}
@@ -274,124 +219,91 @@ func (e *ECFieldElement) Sqrt() *ECFieldElement {
 
 // ToByteArray --- NoUsed
 func (e *ECFieldElement) ToByteArray() []byte {
+	eData := e.value.Bytes()
+	eLen := len(eData)
 
-	data := e.value.Bytes()
-	dlen := len(data)
+	byteArray := make([]byte, eLen)
+	copy(byteArray, eData)
 
-	if len(data) == 32 {
-		Reverse(data)
-		return data
-	}
-	if len(data) > 32 {
-		data1 := data[0:32]
-		Reverse(data1)
-		return data1
-	}
-	Reverse(data)
-	var data2 = make([]byte, 32)
+	return byteArray
+}
 
-	copy(data2[32-dlen:], data)
-	return data2
+// Mul ---
+func (e *ECFieldElement) Mul(x *ECFieldElement, y *ECFieldElement) *ECFieldElement {
+	return e.MulBig(x, y.value)
+}
+
+// Div ---
+func (e *ECFieldElement) Div(x *ECFieldElement, y *ECFieldElement) *ECFieldElement {
+	return e.DivBig(x, y.value)
+}
+
+// Add ---
+func (e *ECFieldElement) Add(x *ECFieldElement, y *ECFieldElement) *ECFieldElement {
+	return e.AddBig(x, y.value)
+}
+
+// Sub ---
+func (e *ECFieldElement) Sub(x *ECFieldElement, y *ECFieldElement) *ECFieldElement {
+	return e.SubBig(x, y.value)
 }
 
 // Neg ---
 func (e *ECFieldElement) Neg(x *ECFieldElement) *ECFieldElement {
 
-	Tmp := big.NewInt(0)
-	Tmp.Neg(e.value)
-	Tmp.Mod(Tmp, x.curveParam.P)
+	negX := big.NewInt(0)
+	negX.Neg(x.value)
+	negX.Mod(negX, x.curveParam.P)
 
-	return &ECFieldElement{Tmp, x.curveParam}
-}
+	e.value.Set(negX)
 
-// Mul ---
-func (e *ECFieldElement) Mul(x *ECFieldElement, y *ECFieldElement) *ECFieldElement {
-
-	Tmp := big.NewInt(0)
-	Tmp.Mul(x.value, y.value)
-	Tmp.Mod(Tmp, x.curveParam.P)
-	e.value.Set(Tmp)
-
-	return &ECFieldElement{Tmp, x.curveParam}
+	return &ECFieldElement{negX, x.curveParam}
 }
 
 // MulBig ---
 func (e *ECFieldElement) MulBig(x *ECFieldElement, y *big.Int) *ECFieldElement {
+	pro := big.NewInt(0)
+	pro.Mul(x.value, y)
+	pro.Mod(pro, x.curveParam.P)
 
-	Tmp := big.NewInt(0)
-	Tmp.Mul(x.value, y)
-	Tmp.Mod(Tmp, x.curveParam.P)
-	e.value.Set(Tmp)
+	e.value.Set(pro)
 
-	return &ECFieldElement{Tmp, x.curveParam}
+	return &ECFieldElement{pro, x.curveParam}
 }
 
-// Div ---？？？
-func (e *ECFieldElement) Div(x *ECFieldElement, y *ECFieldElement) *ECFieldElement {
-
-	Tmp := big.NewInt(0)
-	Tmp1 := big.NewInt(0)
-	Tmp1.ModInverse(y.value, x.curveParam.P)
-	Tmp.Mul(x.value, Tmp1)
-	Tmp.Mod(Tmp, x.curveParam.P)
-
-	e.value.Set(Tmp)
-	return &ECFieldElement{Tmp, x.curveParam}
-}
-
-// DivBig ---？？？
+// DivBig ---
 func (e *ECFieldElement) DivBig(x *ECFieldElement, y *big.Int) *ECFieldElement {
+	inv := big.NewInt(0)
+	inv.ModInverse(y, x.curveParam.P)
 
-	Tmp := big.NewInt(0)
-	Tmp1 := big.NewInt(0)
-	Tmp1.ModInverse(y, x.curveParam.P)
-	Tmp.Mul(x.value, Tmp1)
-	Tmp.Mod(Tmp, x.curveParam.P)
+	quo := big.NewInt(0)
+	quo.Mul(x.value, inv)
+	quo.Mod(quo, x.curveParam.P)
 
-	e.value.Set(Tmp)
-	return &ECFieldElement{Tmp, x.curveParam}
-}
+	e.value.Set(quo)
 
-// Add ---
-func (e *ECFieldElement) Add(x *ECFieldElement, y *ECFieldElement) *ECFieldElement {
-
-	Tmp := big.NewInt(0)
-	Tmp.Add(x.value, y.value)
-	Tmp.Mod(Tmp, x.curveParam.P)
-
-	e.value.Set(Tmp)
-	return &ECFieldElement{Tmp, x.curveParam}
+	return &ECFieldElement{quo, x.curveParam}
 }
 
 // AddBig ---
 func (e *ECFieldElement) AddBig(x *ECFieldElement, y *big.Int) *ECFieldElement {
+	sum := big.NewInt(0)
+	sum.Add(x.value, y)
+	sum.Mod(sum, x.curveParam.P)
 
-	Tmp := big.NewInt(0)
-	Tmp.Add(x.value, y)
-	Tmp.Mod(Tmp, x.curveParam.P)
+	e.value.Set(sum)
 
-	e.value.Set(Tmp)
-	return &ECFieldElement{Tmp, x.curveParam}
-}
-
-// Sub ---
-func (e *ECFieldElement) Sub(x *ECFieldElement, y *ECFieldElement) *ECFieldElement {
-
-	Tmp := big.NewInt(0)
-	Tmp.Sub(x.value, y.value)
-	Tmp.Mod(Tmp, x.curveParam.P)
-
-	e.value.Set(Tmp)
-	return &ECFieldElement{Tmp, x.curveParam}
+	return &ECFieldElement{sum, x.curveParam}
 }
 
 // SubBig ---
 func (e *ECFieldElement) SubBig(x *ECFieldElement, y *big.Int) *ECFieldElement {
 
-	Tmp := big.NewInt(0)
-	Tmp.Sub(x.value, y)
-	Tmp.Mod(Tmp, x.curveParam.P)
+	dif := big.NewInt(0)
+	dif.Sub(x.value, y)
+	dif.Mod(dif, x.curveParam.P)
 
-	e.value.Set(Tmp)
-	return &ECFieldElement{Tmp, x.curveParam}
+	e.value.Set(dif)
+
+	return &ECFieldElement{dif, x.curveParam}
 }
